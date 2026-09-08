@@ -1,1 +1,12 @@
+# 本地任务备忘（与交付代码无关）
 task.md
+
+# Go 构建产物
+/bin/
+/.gocache/
+*.exe
+*.test
+*.out
+
+# 本地运行时产物
+*.log

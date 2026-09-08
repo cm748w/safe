@@ -1,0 +1,56 @@
+services:
+  server:
+    build:
+      context: .
+      args:
+        APP: server
+    image: banner-fingerprint/server:latest
+    init: true
+    # 运行期加固：只读根文件系统、非 root、丢弃全部 capabilities、禁止提权。
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp
+    environment:
+      RULES_PATH: /rules/rules.json
+      LOG_LEVEL: info
+    volumes:
+      # 识别规则与代码解耦：改规则只需编辑本文件并 `docker compose restart server`。
+      - ./rules/rules.json:/rules/rules.json:ro
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+    networks: [banner]
+
+  client:
+    build:
+      context: .
+      args:
+        APP: client
+    image: banner-fingerprint/client:latest
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      # 容器间访问收敛：仅通过 compose 内部网络 + 服务名访问，不对宿主机暴露端口。
+      SERVER_URL: http://server:8080
+      INPUT_FILE: /data/input.json
+    volumes:
+      - ./data/input.json:/data/input.json:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: "no"
+    networks: [banner]
+
+networks:
+  banner:
+    driver: bridge

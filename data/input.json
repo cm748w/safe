@@ -1,0 +1,22 @@
+[
+  {"ip": "1.2.3.4", "port": 22, "banner": "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3"},
+  {"ip": "1.2.3.5", "port": 80, "banner": "HTTP/1.1 200 OK\r\nServer: nginx/1.24.0\r\nContent-Type: text/html"},
+  {"ip": "1.2.3.6", "port": 443, "banner": "HTTP/1.1 200 OK\r\nServer: Apache/2.4.57"},
+  {"ip": "1.2.3.7", "port": 3306, "banner": "J\u0000\u0000\u0000\n8.0.32\u0000"},
+  {"ip": "1.2.3.8", "port": 6379, "banner": "-ERR wrong number of arguments for 'get' command"},
+  {"ip": "1.2.3.9", "port": 21, "banner": "220 ProFTPD 1.3.7 Server (ProFTPD)"},
+  {"ip": "1.2.3.10", "port": 8080, "banner": "HTTP/1.1 404 Not Found\r\nServer: Jetty/9.4.51"},
+  {"ip": "1.2.3.11", "port": 22, "banner": "SSH-2.0-OpenSSH_9.3 Debian-1"},
+  {"ip": "1.2.3.12", "port": 80, "banner": "HTTP/1.1 200 OK\r\nServer: nginx/1.18.0 (Ubuntu)"},
+  {"ip": "1.2.3.13", "port": 443, "banner": "HTTP/1.1 200 OK\r\nServer: Apache/2.4.41 (Ubuntu)"},
+  {"ip": "1.2.3.14", "port": 3306, "banner": "J\u0000\u0000\u0000\n5.7.42\u0000"},
+  {"ip": "1.2.3.15", "port": 6379, "banner": "+PONG"},
+  {"ip": "1.2.3.16", "port": 21, "banner": "220 (vsFTPd 3.0.5)"},
+  {"ip": "1.2.3.17", "port": 8443, "banner": "HTTP/1.1 200 OK\r\nServer: nginx/1.25.3"},
+  {"ip": "1.2.3.18", "port": 22, "banner": "SSH-1.99-OpenSSH_4.3"},
+  {"ip": "1.2.3.19", "port": 9999, "banner": "\u0016\u0003\u0001\u0000\u00a5\u0001\u0000\u0000\u00a1"},
+  {"ip": "1.2.3.20", "port": 8888, "banner": "HTTP/1.1 200 OK\r\nServer: Microsoft-IIS/10.0"},
+  {"ip": "1.2.3.21", "port": 6379, "banner": "-NOAUTH Authentication required."},
+  {"ip": "1.2.3.22", "port": 21, "banner": "220 Welcome to Pure-FTPd"},
+  {"ip": "1.2.3.23", "port": 12345, "banner": "QUIT\r\n"}
+]

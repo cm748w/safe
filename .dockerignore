@@ -1,0 +1,12 @@
+# 构建上下文只需要 Go 源码 + 规则文件；运行期输入/配置由 compose 挂载，不打进镜像
+.git
+.gitignore
+README.md
+task.md
+Makefile
+docker-compose.yml
+Dockerfile
+.dockerignore
+data
+bin
+*.log
