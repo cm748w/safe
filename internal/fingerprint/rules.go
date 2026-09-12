@@ -38,8 +38,17 @@ type Rule struct {
 }
 
 // LoadRulesFile reads and parses a rules file from disk.
+//
+// The path is caller-supplied, but every caller is startup configuration: the
+// RULES_PATH environment variable or the fixed candidate list in
+// cmd/server/main.go. No request data ever reaches it, so this is not a
+// path-traversal sink; the trust boundary is whoever can set the process
+// environment, which is by definition already able to run the binary. Scoping
+// the read under an os.Root would therefore add no real protection while
+// breaking the documented support for absolute paths (for example the
+// /rules/rules.json mount used by the container image).
 func LoadRulesFile(path string) ([]Rule, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- operator-supplied startup config, never request input.
 	if err != nil {
 		return nil, fmt.Errorf("read rules file %q: %w", path, err)
 	}

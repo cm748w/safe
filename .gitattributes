@@ -1,0 +1,4 @@
+# Normalise line endings at check-in so `gofmt -l` cannot report false
+# positives on a working tree that was once authored with CRLF.
+* text=auto eol=lf
+*.go text eol=lf

@@ -5,8 +5,9 @@
 //	POST /fingerprint  batch-identify a JSON array of {ip, port, banner}
 //	GET  /health       liveness probe
 //
-// The handler is hardened against oversized bodies, record floods, and panics;
-// it never fails the whole batch because of an unrecognizable banner.
+// The handler is hardened against oversized bodies, record floods, request
+// floods, and panics; it never fails the whole batch because of an
+// unrecognizable banner.
 package server
 
 import (
@@ -24,8 +25,8 @@ import (
 )
 
 const (
-	defaultMaxBodyBytes = 8 << 20 // 8 MiB
-	defaultMaxRecords   = 10000
+	defaultMaxBodyBytes  = 8 << 20 // 8 MiB
+	defaultMaxRecords    = 10000
 	defaultMaxConcurrent = 64
 )
 
@@ -38,6 +39,13 @@ type Config struct {
 	MaxBodyBytes  int64
 	MaxRecords    int
 	MaxConcurrent int
+	// RateLimitPerSec is the sustained per-client-IP request budget for
+	// /fingerprint. Zero selects the default; a negative value disables rate
+	// limiting entirely.
+	RateLimitPerSec float64
+	// RateLimitBurst is the per-client-IP burst size (bucket depth). Values
+	// below 1 select the default.
+	RateLimitBurst int
 }
 
 // Server wraps an engine plus request guards.
@@ -46,6 +54,7 @@ type Server struct {
 	logger  *slog.Logger
 	version string
 	sem     chan struct{}
+	limiter *RateLimiter
 }
 
 // New builds a Server, applying defaults for unset limits.
@@ -65,20 +74,39 @@ func New(cfg Config) *Server {
 	if cfg.MaxConcurrent <= 0 {
 		cfg.MaxConcurrent = defaultMaxConcurrent
 	}
+	if cfg.RateLimitBurst <= 0 {
+		cfg.RateLimitBurst = defaultRateLimitBurst
+	}
+	// Zero means "unset" and falls back to the default. Operators who want to
+	// turn rate limiting off set a negative rate, which is kept as-is so that
+	// "disabled" cannot be confused with "not configured".
+	if cfg.RateLimitPerSec == 0 {
+		cfg.RateLimitPerSec = defaultRateLimitPerSec
+	}
 	return &Server{
 		cfg:     cfg,
 		logger:  cfg.Logger,
 		version: cfg.Version,
 		sem:     make(chan struct{}, cfg.MaxConcurrent),
+		limiter: newRateLimiter(limiterOptions{
+			perSec: cfg.RateLimitPerSec,
+			burst:  cfg.RateLimitBurst,
+			now:    time.Now,
+			ttl:    cleanupInterval(cfg.RateLimitPerSec, cfg.RateLimitBurst),
+			sweep:  defaultSweepInterval,
+			shards: numLimitShards,
+		}),
 	}
 }
 
-// Handler returns the wrapped HTTP handler (routing + middleware).
+// Handler returns the wrapped HTTP handler (routing + middleware). Middleware is
+// applied outermost-first: panic recovery, then request logging, then rate
+// limiting, so a throttled request is still counted in the access log.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("POST /fingerprint", s.handleFingerprint)
-	return s.recoverMiddleware(s.logMiddleware(mux))
+	return s.recoverMiddleware(s.logMiddleware(s.rateLimitMiddleware(mux)))
 }
 
 // HTTPServer returns a fully time-boxed http.Server for this handler.
