@@ -1,0 +1,112 @@
+# Continuous integration.
+#
+# The project has zero third-party dependencies, so every job below only needs
+# the Go toolchain plus (for two jobs) a pinned static-analysis binary fetched
+# with `go install`. All action and tool versions are pinned deliberately so a
+# green build means the same thing tomorrow.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GOTELEMETRY: "off"
+  GOTOOLCHAIN: local
+
+jobs:
+  build:
+    name: build / vet / fmt / test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # The toolchain is pinned to the version declared in go.mod so CI and
+          # local builds cannot drift apart.
+          go-version-file: go.mod
+          check-latest: false
+          cache: true
+
+      - name: Verify module has no third-party requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq '^[[:space:]]*require' go.mod; then
+            echo "::error::go.mod contains a require block; this project must stay dependency-free."
+            exit 1
+          fi
+          if [ -f go.sum ]; then
+            echo "::error::go.sum exists but the project must have zero third-party dependencies."
+            exit 1
+          fi
+
+      - name: gofmt -l (must be empty)
+        shell: bash
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::the following files are not gofmt-clean:"
+            echo "$unformatted"
+            gofmt -d .
+            exit 1
+          fi
+          echo "gofmt: clean"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test (race + coverage)
+        run: go test -race -cover ./...
+
+  golangci-lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: false
+
+      - name: golangci-lint
+        # v2.13.2 is a real, pinned release (pinning matters: `@latest` silently
+        # switches between the v1 and v2 CLI contracts, and v1 cannot parse a v2
+        # module path).
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+          "$(go env GOPATH)/bin/golangci-lint" run --no-config ./...
+
+  gosec:
+    name: gosec
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: false
+          cache: false
+
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+          "$(go env GOPATH)/bin/gosec" ./...

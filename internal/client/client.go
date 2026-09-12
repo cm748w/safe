@@ -54,7 +54,10 @@ func Run(cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("post to %s: %w", cfg.ServerURL, err)
 	}
-	defer resp.Body.Close()
+	// The body is fully read below; a close error on an already-drained
+	// response body carries no actionable information, so it is explicitly
+	// discarded rather than silently ignored (errcheck requires the explicit _).
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 	if err != nil {
@@ -74,21 +77,35 @@ func Run(cfg Config) error {
 		if err != nil {
 			return fmt.Errorf("marshal results: %w", err)
 		}
-		fmt.Println(string(out))
+		if _, err := fmt.Fprintln(os.Stdout, string(out)); err != nil {
+			return fmt.Errorf("write results: %w", err)
+		}
 		return nil
 	}
 
-	printTable(results)
-	return nil
+	return printTable(results)
 }
 
-func printTable(results []fingerprint.Result) {
+// printTable renders the results as an aligned table. Write failures are
+// reported rather than ignored so that a closed stdout (for example a broken
+// pipe) does not silently drop output.
+func printTable(results []fingerprint.Result) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "IP\tPORT\tPROTOCOL\tPRODUCT\tVERSION\tOS_HINT\tCONFIDENCE")
-	for _, r := range results {
-		fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\t%.2f\n",
-			r.IP, r.Port, r.Protocol, r.Product, r.Version, r.OsHint, r.Confidence)
+	if _, err := fmt.Fprintln(w, "IP\tPORT\tPROTOCOL\tPRODUCT\tVERSION\tOS_HINT\tCONFIDENCE"); err != nil {
+		return fmt.Errorf("write table header: %w", err)
 	}
-	w.Flush()
-	fmt.Printf("\nidentified %d record(s)\n", len(results))
+	for _, r := range results {
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\t%.2f\n",
+			r.IP, r.Port, r.Protocol, r.Product, r.Version, r.OsHint, r.Confidence); err != nil {
+			return fmt.Errorf("write table row: %w", err)
+		}
+	}
+	// Flush before the summary so the table and its trailer keep their order.
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("flush table: %w", err)
+	}
+	if _, err := fmt.Fprintf(os.Stdout, "\nidentified %d record(s)\n", len(results)); err != nil {
+		return fmt.Errorf("write summary: %w", err)
+	}
+	return nil
 }

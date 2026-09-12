@@ -27,13 +27,15 @@ func main() {
 	addr := listenAddr()
 
 	srv := server.New(server.Config{
-		Addr:          addr,
-		Version:       version,
-		Engine:        engine,
-		Logger:        logger,
-		MaxBodyBytes:  envInt64("MAX_BODY_BYTES", 8<<20),
-		MaxRecords:    envInt("MAX_RECORDS", 10000),
-		MaxConcurrent: envInt("MAX_CONCURRENT", 64),
+		Addr:            addr,
+		Version:         version,
+		Engine:          engine,
+		Logger:          logger,
+		MaxBodyBytes:    envInt64("MAX_BODY_BYTES", 8<<20),
+		MaxRecords:      envInt("MAX_RECORDS", 10000),
+		MaxConcurrent:   envInt("MAX_CONCURRENT", 64),
+		RateLimitPerSec: envFloat("RATE_LIMIT_PER_SEC", 20),
+		RateLimitBurst:  envInt("RATE_LIMIT_BURST", 40),
 	})
 	httpSrv := srv.HTTPServer()
 
@@ -124,3 +126,15 @@ func envInt64(key string, def int64) int64 {
 	return def
 }
 
+// envFloat parses a floating-point setting such as the per-second rate limit.
+// Fractional rates are useful for exposing a small budget (a rate of 0.5 means
+// one request every two seconds). Values that are absent, malformed, or
+// non-positive fall back to def.
+func envFloat(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			return f
+		}
+	}
+	return def
+}
